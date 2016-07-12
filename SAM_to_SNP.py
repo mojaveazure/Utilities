@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Script to find SNP positions based off of mapped alignment (SAM File) and capture design"""
 
+#   Borrowed heavily from Thomas Kono
+
 import sys
 if not sys.version_info.major == 3:
     sys.exit("Please use Python 3 for this script")
