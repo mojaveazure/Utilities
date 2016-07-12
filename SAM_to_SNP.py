@@ -26,7 +26,7 @@ class SNP(object):
         Reference Base
         Alternate Base
     """
-    _REVERSE_COMPLEMENT = str.maketrans('ACGT', 'TCGA') # Traslation table for reverse complentary sequences
+    _REVERSE_COMPLEMENT = str.maketrans('ACGT', 'TGCA') # Traslation table for reverse complentary sequences
     def __init__(self, lookup, alignment, reference):
         try:
             #   Ensure we've been given a lookup and alignment object
@@ -50,11 +50,14 @@ class SNP(object):
         if alignment.get_rc(): # If we're reverse complementing
             qpos = lookup.get_reverse_position() - 1 # Start with the reverse position of the SNP, must subtract one
         else: # Otherwise
-            qpos = lookup.get_forward_position() + 1 # Start with the forward posittion, must add one
+            qpos = lookup.get_forward_position() # Start with the forward posittion
         while True: # Endless loop to do weird things...
             try: # While we have a CIGAR string to parse
                 old = qpos # Store our previously calculated SNP position
                 #   Seach the CIGAR string as a list, starting with index 0, for indels
+                if re.search('M', alignment.get_cigar()[index]): # If we have a perfect match
+                    if qpos < int(''.join(re.findall(r'\d+', alignment.get_cigar()[index]))): # If our SNP is in the perfect match
+                        break # Exit the loop, we have our position
                 if re.search('D', alignment.get_cigar()[index]): # If we have a deletion relative to reference
                     qpos += int(''.join(re.findall(r'\d+', alignment.get_cigar()[index]))) # Add the deletion to our SNP position
                 if re.search('I', alignment.get_cigar()[index]): # If we have an insertion relative to reference
@@ -326,7 +329,7 @@ def main():
         out.close()
     if len(unmapped) > 0:
         #   Write any unmapped SNPs to a log file
-        print("Failed to map " + str(len(unmapped)) + " back to the reference", file=sys.stderr)
+        print("Failed to map " + str(len(unmapped)) + " SNPs back to the reference", file=sys.stderr)
         print("Writing unmapped SNP IDs to unmapped.log", file=sys.stderr)
         un = open('unmapped.log', 'w')
         for fail in unmapped:
@@ -336,3 +339,22 @@ def main():
 
 
 main()
+
+# a3 = Alignment('SCRI_RS_183593\t0\tchr7H\t643580644\t3\t115M2I4M\t*\t0\t0\tGCAGGGGAAGCTCAAACCTCTGGTGATCCTCGCCATCGTGGCCGGTGACCTCGCCGGCGTAGGGCTCCTCTTCATGCTCTTCATGTACGTCTACCACATCAGGAAGAAGCGGCGGCAGTCG\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-47\tXN:i:0\tXM:i:6\tXO:i:1\tXG:i:2\tNM:i:8\tMD:Z:21T8T14C14C55A0G1\tYT:Z:UU')
+
+# l3 = Lookup('SCRI_RS_183593', 'GCAGGGGAAGCTCAAACCTCTGGTGATCCTCGCCATCGTGGCCGGTGACCTCGCCGGCGT[A/C]GGGCTCCTCTTCATGCTCTTCATGTACGTCTACCACATCAGGAAGAAGCGGCGGCAGTCG')
+
+# a1 = Alignment('SCRI_RS_172072\t0\tchr4H\t609246960\t42\t121M\t*\t0\t0\tGTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTTACATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-12\tXN:i:0\tXM:i:2\tXO:i:0\tXG:i:0\tNM:i:2\tMD:Z:60G11T48\tYT:Z:UU')
+
+# l1 = Lookup('SCRI_RS_172072', 'GTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTT[A/G]CATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT')
+
+# seq1 = 'GTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTTACATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT'
+
+# r = SeqIO.to_dict(SeqIO.parse('/home/paul/Desktop/SAM_SNPs/150831_barley_pseudomolecules.fasta', 'fasta'))
+
+
+# a2 = Alignment('11_20712\t0\tchr1H\t15607210\t42\t223M1D18M\t*\t0\t0\tGCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGAGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGACAAAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-20\tXN:i:0\tXM:i:2\tXO:i:1\tXG:i:1\tNM:i:3\tMD:Z:51T131C39^G18\tYT:Z:UU')
+
+# l2 = Lookup('11_20712', 'GCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGYGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGAC[A/G]AAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT')
+
+# seq2 = 'GCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGAGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGACAAAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT'
