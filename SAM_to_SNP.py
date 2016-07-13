@@ -79,6 +79,13 @@ class SNP(object):
         #   Get the alternate using the IUPAC code in the lookup table
         self._alternate = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
 
+    def check_masked(self):
+        """Check to see if our alternate allele is masked"""
+        if self._alternate == 'N':
+            return True
+        else:
+            return False
+
     def format_vcf(self):
         """Format the information in VCF style"""
         vcf_line = [
@@ -285,6 +292,7 @@ def main():
     alignment_dict = {} # Create a dictionary to hold alignments
     SNPs = [] # Create a list of SNPs
     unmapped = [] # Create a list of unmapped designs
+    masked = [] # Create a list of SNPs that have a masked alternate allele
     #   Create a header for our VCF
     header = '##fileformat=VCFv4.2\n##INFO<ID=s,Number=1,Type=Flag,Description="Variant is calculated from SAM">\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n'
     try: # Attempt to read in our data
@@ -312,7 +320,10 @@ def main():
                 s = SNP(lookup_dict[l], alignment_dict[l], reference) # Find information about the SNP
             except AssertionError:
                 sys.exit("Something happened with creating a SNP object...")
-            SNPs.append(s) # Append the SNP to our list of SNPs
+            if s.check_masked(): # Check to see if the alternate allele was masked
+                masked.append(s) # If so, add SNP to list of masked SNPs
+            else: # Otherwise
+                SNPs.append(s) # Append the SNP to our list of SNPs
         else: # Otherwise
             unmapped.append(l) # Append lookup SNP ID to our list of unmapped
     if len(SNPs) < 1:
@@ -327,6 +338,16 @@ def main():
             out.write(snp.format_vcf())
             out.write('\n')
         out.close()
+    if len(masked) > 0:
+        # Write any masked SNPs to a VCF
+        maskedname = args['outname'] + '_masked.vcf'
+        maskedfile = open(maskedname, 'w')
+        print("Writing " + str(len(masked)) + " masked SNPs to " + maskedname, file=sys.stderr)
+        maskedfile.write(header)
+        for snp in masked:
+            out.write(snp.format_vcf())
+            out.write('\n')
+        maskedfile.close()
     if len(unmapped) > 0:
         #   Write any unmapped SNPs to a log file
         print("Failed to map " + str(len(unmapped)) + " SNPs back to the reference", file=sys.stderr)
@@ -339,22 +360,3 @@ def main():
 
 
 main()
-
-# a3 = Alignment('SCRI_RS_183593\t0\tchr7H\t643580644\t3\t115M2I4M\t*\t0\t0\tGCAGGGGAAGCTCAAACCTCTGGTGATCCTCGCCATCGTGGCCGGTGACCTCGCCGGCGTAGGGCTCCTCTTCATGCTCTTCATGTACGTCTACCACATCAGGAAGAAGCGGCGGCAGTCG\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-47\tXN:i:0\tXM:i:6\tXO:i:1\tXG:i:2\tNM:i:8\tMD:Z:21T8T14C14C55A0G1\tYT:Z:UU')
-
-# l3 = Lookup('SCRI_RS_183593', 'GCAGGGGAAGCTCAAACCTCTGGTGATCCTCGCCATCGTGGCCGGTGACCTCGCCGGCGT[A/C]GGGCTCCTCTTCATGCTCTTCATGTACGTCTACCACATCAGGAAGAAGCGGCGGCAGTCG')
-
-# a1 = Alignment('SCRI_RS_172072\t0\tchr4H\t609246960\t42\t121M\t*\t0\t0\tGTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTTACATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-12\tXN:i:0\tXM:i:2\tXO:i:0\tXG:i:0\tNM:i:2\tMD:Z:60G11T48\tYT:Z:UU')
-
-# l1 = Lookup('SCRI_RS_172072', 'GTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTT[A/G]CATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT')
-
-# seq1 = 'GTCTCTCATCTATCTATCTTGGCATAACGAGTCACACGACATGCTAAAAATGGTCAAGTTACATTGAATTAGCATACACATAACACGCTAAGAACGATCACATTGCAAATGAAACTAAAAT'
-
-# r = SeqIO.to_dict(SeqIO.parse('/home/paul/Desktop/SAM_SNPs/150831_barley_pseudomolecules.fasta', 'fasta'))
-
-
-# a2 = Alignment('11_20712\t0\tchr1H\t15607210\t42\t223M1D18M\t*\t0\t0\tGCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGAGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGACAAAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tAS:i:-20\tXN:i:0\tXM:i:2\tXO:i:1\tXG:i:1\tNM:i:3\tMD:Z:51T131C39^G18\tYT:Z:UU')
-
-# l2 = Lookup('11_20712', 'GCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGYGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGAC[A/G]AAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT')
-
-# seq2 = 'GCCAGCCTGCGATGCTTGGTCAACTTAGTGCAAGCATTCACTTGAATCTAGAGTAGTATGTCGGTTGCATGTTTGCGCCGTGAGCTCATTTGTTGCCCTCTGGTGTCGCAATTTCTGGACAAAGGGAATCCATGTCTGTAATACACCGTGTACATTCTAGGGTTTGTGTGACAACAGAATCAATTTAATTTTTAACGAGCAACCAAATACCGACTGACAGCATTATGAGGTATGAACACCT'
