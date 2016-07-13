@@ -81,13 +81,14 @@ class SNP(object):
 
     def check_masked(self):
         """Check to see if our alternate allele is masked"""
-        if self._alternate == 'N':
-            return True
-        else:
-            return False
+        if self._alternate == 'N': # If our alternate allele is masked, or an 'N'
+            return True # Return True
+        else: # Otherwise
+            return False # Return False
 
     def format_vcf(self):
         """Format the information in VCF style"""
+        #   Create a list of information for a VCF file
         vcf_line = [
             self._contig,
             str(self._position),
@@ -98,7 +99,7 @@ class SNP(object):
             '.',
             's'
             ]
-        return '\t'.join(vcf_line)
+        return '\t'.join(vcf_line) # Join everything together with a tab
 
 
 #   A class definition for a SAM alignment
@@ -345,8 +346,8 @@ def main():
         print("Writing " + str(len(masked)) + " masked SNPs to " + maskedname, file=sys.stderr)
         maskedfile.write(header)
         for snp in masked:
-            out.write(snp.format_vcf())
-            out.write('\n')
+            maskedfile.write(snp.format_vcf())
+            maskedfile.write('\n')
         maskedfile.close()
     if len(unmapped) > 0:
         #   Write any unmapped SNPs to a log file
