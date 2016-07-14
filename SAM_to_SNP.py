@@ -32,6 +32,7 @@ class SNP(object):
             #   Ensure we've been given a lookup and alignment object
             assert isinstance(lookup, Lookup)
             assert isinstance(alignment, Alignment)
+            assert isinstance(reference, dict)
         except AssertionError:
             raise
         self._snpid = lookup.get_snpid() # The SNP ID is the same as the one in the lookup
@@ -75,9 +76,9 @@ class SNP(object):
         #   Get the reference allele, given our contig and position found above
         self._reference = reference[self._contig][self._position - 1] # Subtract one as FASTA is 1-based and Python is 0-based
         if alignment.get_rc(): # If we're reverse complement
-            self._reference = self._reference.translate(self._REVERSE_COMPLEMENT) # Use our translation table to reverse complement
-        #   Get the alternate using the IUPAC code in the lookup table
-        self._alternate = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
+            self._alternate = lookup.get_alternate(self._reference.translate(self._REVERSE_COMPLEMENT)).translate(self._REVERSE_COMPLEMENT) # Use our translation table to reverse complement
+        else:
+            self._alternate = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
 
     def check_masked(self):
         """Check to see if our alternate allele is masked"""
