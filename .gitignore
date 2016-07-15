@@ -1,6 +1,11 @@
 # .vscode/ directory
 .vscode/
 
+# Data files
+*.vcf
+*.sam
+*.bam
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
