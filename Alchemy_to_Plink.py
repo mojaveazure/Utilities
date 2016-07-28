@@ -85,8 +85,8 @@ class Pedigree(object):
             str(self._individual),
             str(self._paternal),
             str(self._maternal),
-            str(self._sex),
-            str(self._phenotype)
+            str(self._sex)
+            # str(self._phenotype)
         ] + self._selected_genotypes
         return '\t'.join(ped_line)
 
