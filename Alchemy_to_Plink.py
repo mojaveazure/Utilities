@@ -85,8 +85,8 @@ class Pedigree(object):
             str(self._individual),
             str(self._paternal),
             str(self._maternal),
-            str(self._sex)
-            # str(self._phenotype)
+            str(self._sex),
+            str(self._phenotype)
         ] + self._selected_genotypes
         return '\t'.join(ped_line)
 
@@ -177,7 +177,7 @@ def main():
             try:
                 pedigree[sample].select_genotypes(snpid)
             except KeyError:
-                unfound_snps.append(snpid)
+                unfound_snps.append(sorted_map.pop(snp))
     #   Write the outputs
     print("Writing output files", file=sys.stderr)
     if os.path.dirname(args['alchemy']) == '':
@@ -212,7 +212,8 @@ def main():
     if len(unfound_snps) > 0:
         print("Failed to find", str(len(unfound_snps)), "snps in", args['alchemy'], file=sys.stderr)
         with open(unfound_out, 'w') as uo:
-            for snpid in unfound_snps:
+            for snp in unfound_snps:
+                (snpid, chrom, cm, pp) = snp
                 uo.write(snpid)
                 uo.write('\n')
 
