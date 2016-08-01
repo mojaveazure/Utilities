@@ -42,7 +42,7 @@ class MapFile(object):
         """Sort the genetic map by chromosome, then genetic map position"""
         sorted_snps = sorted(
             self._genetic_data,
-            key=lambda tup : (tup[1], tup[2])
+            key=lambda tup : (tup[1], float(tup[2]))
         )
         return sorted_snps
 
