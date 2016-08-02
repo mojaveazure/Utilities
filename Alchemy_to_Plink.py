@@ -178,12 +178,12 @@ def main():
     unfound_snps = []
     print("Selecting SNPs from", args['harvest'], file=sys.stderr)
     for sample in pedigree.keys():
-        for snp in sorted_map:
+        for index, snp in enumerated(sorted_map):
             (snpid, chrom, cm, pp) = snp
             try:
                 pedigree[sample].select_genotypes(snpid)
             except KeyError:
-                unfound_snps.append(sorted_map.pop(snp))
+                unfound_snps.append(sorted_map.pop(index))
     #   Write the outputs
     print("Writing output files", file=sys.stderr)
     if os.path.dirname(args['alchemy']) == '':
