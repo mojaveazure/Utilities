@@ -178,7 +178,7 @@ def main():
     unfound_snps = []
     print("Selecting SNPs from", args['harvest'], file=sys.stderr)
     for sample in pedigree.keys():
-        for index, snp in enumerated(sorted_map):
+        for index, snp in enumerate(sorted_map):
             (snpid, chrom, cm, pp) = snp
             try:
                 pedigree[sample].select_genotypes(snpid)
