@@ -153,6 +153,7 @@ def main():
         #   Alchemy data
         print("Reading in", args['alchemy'], file=sys.stderr)
         pedigree = dict() # PED FILE
+        b_calls = dict()
         with open(args['alchemy'], 'r') as a:
             for line in a:
                 if line.startswith('#'):
@@ -162,6 +163,11 @@ def main():
                 sample = split_line[1]
                 genotypes = split_line[3]
                 probability = split_line[4]
+                if sum(lambda base: base in ['A', 'C', 'G', 'T', 'N'], genotypes) is not 2:
+                    p = Pedigree(sample)
+                    p.assign_genotype(snp, genotypes, probability)
+                    b_calls[sample] = p
+                    continue
                 if sample not in pedigree.keys():
                     p = Pedigree(sample)
                     pedigree[sample] = p # Add our single pedigree to our pedigree file (DICT)
@@ -186,6 +192,7 @@ def main():
         outdir = os.path.dirname(args['alchemy'])
     ped_output = outdir + '/' + args['output'] + '.ped'
     map_output = outdir + '/' + args['output'] + '.map'
+    bcalls_output = outdir + '/' + args['output'] + '.bcalls'
     unfound_out = outdir + '/' + 'unfound_snps.log'
     if os.path.isfile(ped_output):
         poo = overwrite(ped_output)
@@ -216,6 +223,13 @@ def main():
                 (snpid, chrom, cm, pp) = snp
                 uo.write(snpid)
                 uo.write('\n')
+    if len(b_calls) > 0:
+        print("Found", len(b_calls), "invalid calls, writing to", bcalls_output, file=sys.stderr)
+        with open(bcalls_output, 'w') as bo:
+            for sample in sorted(b_calls.keys()):
+                bo.write(b_calls[sample].format_pedigree())
+                bo.write('\n')
+            bo.flush()
 
 
 if __name__ == '__main__':
