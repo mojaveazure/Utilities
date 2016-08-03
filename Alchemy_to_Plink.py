@@ -163,15 +163,20 @@ def main():
                 sample = split_line[1]
                 genotypes = split_line[3]
                 probability = split_line[4]
-                if sum(map(lambda base: base in ['A', 'C', 'G', 'T', 'N'], genotypes)) is not 2:
-                    p = Pedigree(sample)
-                    p.assign_genotype(snp, genotypes, probability)
-                    b_calls[sample] = p
-                    continue
+                # if sum(map(lambda base: base in ['A', 'C', 'G', 'T', 'N'], genotypes)) is not 2:
+                #     p = Pedigree(sample)
+                #     p.assign_genotype(snp, genotypes, probability)
+                #     b_calls[sample] = p
+                #     continue
                 if sample not in pedigree.keys():
                     p = Pedigree(sample)
                     pedigree[sample] = p # Add our single pedigree to our pedigree file (DICT)
-                pedigree[sample].assign_genotype(snp, genotypes, probability)
+                #   Check for valid bases
+                if sum(map(lambda base: base in ['A', 'C', 'G', 'T', 'N'], genotypes)) is not 2:
+                    pedigree[sample].assign_genotype(snp, '00', probability)
+                    b_calls[sample] = pedigree[sample]
+                else:
+                    pedigree[sample].assign_genotype(snp, genotypes, probability)
     except FileNotFoundError as error:
         sys.exit("Failed to find " + error.filename)
     #   Select the genotypes for our SNPs
