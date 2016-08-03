@@ -163,11 +163,6 @@ def main():
                 sample = split_line[1]
                 genotypes = split_line[3]
                 probability = split_line[4]
-                # if sum(map(lambda base: base in ['A', 'C', 'G', 'T', 'N'], genotypes)) is not 2:
-                #     p = Pedigree(sample)
-                #     p.assign_genotype(snp, genotypes, probability)
-                #     b_calls[sample] = p
-                #     continue
                 if sample not in pedigree.keys():
                     p = Pedigree(sample)
                     pedigree[sample] = p # Add our single pedigree to our pedigree file (DICT)
