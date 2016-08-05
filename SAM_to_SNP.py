@@ -16,6 +16,10 @@ try:
 except ImportError:
     sys.exit("Please install BioPython for this script")
 
+
+class NotABaseError(Exception):
+    """You have not provided a single-character string"""
+
 #   A class definition for a SNP
 class SNP(object):
     """A class to hold VCF information about an individual SNP. Stores the
@@ -26,7 +30,17 @@ class SNP(object):
         Reference Base
         Alternate Base
     """
-    _REVERSE_COMPLEMENT = str.maketrans('ACGT', 'TGCA') # Traslation table for reverse complentary sequences
+    @staticmethod
+    def reverse_complement(base):
+        """Get the reverse complement"""
+        try:
+            assert isinstance(base, str)
+            assert len(base) is 1
+            rc = str.maketrans('ACGT', 'TGCA') # Traslation table for reverse complentary sequences
+            return base.translate(rc)
+        except AssertionError:
+            raise NotABaseError
+
     def __init__(self, lookup, alignment, reference):
         try:
             #   Ensure we've been given a lookup and alignment object
@@ -76,9 +90,13 @@ class SNP(object):
         #   Get the reference allele, given our contig and position found above
         self._reference = reference[self._contig][self._position - 1] # Subtract one as FASTA is 1-based and Python is 0-based
         if alignment.get_rc(): # If we're reverse complement
-            self._alternate = lookup.get_alternate(self._reference.translate(self._REVERSE_COMPLEMENT)).translate(self._REVERSE_COMPLEMENT) # Use our translation table to reverse complement
+            alt, do_rc = lookup.get_alternate(self.reverse_complement(self._reference))
+            self._alternate = self.reverse_complement(alt)
+            # self._alternate = lookup.get_alternate(self._reference.translate(self._REVERSE_COMPLEMENT)).translate(self._REVERSE_COMPLEMENT) # Use our translation table to reverse complement
         else:
-            self._alternate = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
+            self._alternate, do_rc = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
+        if do_rc:
+            self._reference = self.reverse_complement(self._reference)
 
     def check_masked(self):
         """Check to see if our alternate allele is masked"""
@@ -223,12 +241,17 @@ class Lookup(object):
     def get_alternate(self, reference):
         """Get the alternate allele given an IUPAC code and reference allele"""
         ref = re.compile(u'(%s)' % reference) # Regex to ensure that our found reference allele is covered by the IUPAC code
+        rc = re.compile(u'(%s)' % SNP.reverse_complement(reference)) # Regex to see if our reference is actually the reverse complement
         alt = re.compile(u'([^%s])' % reference) # Regex to find the alternate allele
+        alt_rc = re.compile(u'([^%s])' % SNP.reverse_complement(reference)) # Regex to find the alternate allele to our reverse complementary sequence
         if ref.search(self._IUPAC_CODES[self._code]): # If our reference allele is plausible given our IUPCA code
             alternate = alt.search(self._IUPAC_CODES[self._code]).group() # Get the alternate
-            return alternate
+            return alternate, False
+        elif rc.search(self._IUPAC_CODES[self._code]):
+            alternate = alt_rc.search(self._IUPAC_CODES[self._code]).group()
+            return alternate, True
         else: # Otherwise, give an 'N'
-            return 'N'
+            return 'N', False
 
 
 #   Make an argument parser
@@ -361,4 +384,5 @@ def main():
         un.close()
 
 
-main()
+if __name__ == '__main__':
+    main()
