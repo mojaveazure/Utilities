@@ -20,6 +20,7 @@ except ImportError:
 class NotABaseError(Exception):
     """You have not provided a single-character string"""
 
+
 #   A class definition for a SNP
 class SNP(object):
     """A class to hold VCF information about an individual SNP. Stores the
@@ -59,10 +60,21 @@ class SNP(object):
         self._calculate_position(lookup, alignment) # True SNP position
         self._find_states(lookup, alignment, reference) # Reference and alternate states
 
+    def __repr__(self):
+        return self._snpid
+
+    def __eq__(self, other):
+        if isinstance(other, SNP):
+            return self._snpid == other._snpid
+        elif isinstance(other, str):
+            return self._snpid == other
+        else:
+            return False
+
     def _calculate_position(self, lookup, alignment):
         """Calculate the position of the SNP in the reference sequence"""
         index = 0 # Index of our split CIGAR string
-        if alignment.get_rc(): # If we're reverse complementing
+        if alignment.get_rc() or lookup.get_rc(): # If we're reverse complementing
             qpos = lookup.get_reverse_position() - 1 # Start with the reverse position of the SNP, must subtract one
         else: # Otherwise
             qpos = lookup.get_forward_position() # Start with the forward posittion
@@ -75,7 +87,7 @@ class SNP(object):
                         break # Exit the loop, we have our position
                 if re.search('D', alignment.get_cigar()[index]): # If we have a deletion relative to reference
                     qpos += int(''.join(re.findall(r'\d+', alignment.get_cigar()[index]))) # Add the deletion to our SNP position
-                if re.search('I', alignment.get_cigar()[index]): # If we have an insertion relative to reference
+                if re.search('[IS]', alignment.get_cigar()[index]): # If we have an insertion relative to reference
                     qpos -= int(''.join(re.findall(r'\d+', alignment.get_cigar()[index]))) # Subtract the insertion from our SNP postion
                 index += 1 # Increase the index
                 if qpos <= 0 or qpos >= lookup.get_length(): # If we've gone beyond the scope of our lookup: 0 is before the sequence, lookup.get_length() is after
@@ -92,7 +104,6 @@ class SNP(object):
         if alignment.get_rc(): # If we're reverse complement
             alt, do_rc = lookup.get_alternate(self.reverse_complement(self._reference))
             self._alternate = self.reverse_complement(alt)
-            # self._alternate = lookup.get_alternate(self._reference.translate(self._REVERSE_COMPLEMENT)).translate(self._REVERSE_COMPLEMENT) # Use our translation table to reverse complement
         else:
             self._alternate, do_rc = lookup.get_alternate(self._reference) # An 'N' will be returned if the reference allele doesn't match with our IUPAC code
         if do_rc:
@@ -141,13 +152,13 @@ class Alignment(object):
         self._pos = int(split_line[3]) # Fourth column, should be an int
         self._cigar = self._CIGAR.findall(split_line[5]) # Sixth column, after breaking up the CIGAR string into a list of component codes
 
+    def __repr__(self):
+        return self._rname + ':' + self._qname
+
     def get_rc(self):
         """Check to see if we're reverse complementing our sequence"""
         #   If the 16th bit is set, it's reverse complement
-        if int(self._flag) & 16:
-            return True
-        else:
-            return False
+        return self._flag is 16
 
     def get_name(self):
         """Get the alignment name"""
@@ -164,6 +175,10 @@ class Alignment(object):
     def get_cigar(self):
         """Get the CIGAR string as a list"""
         return self._cigar
+
+    def check_flag(self):
+        """Make sure we don't have extraneous alignments"""
+        return self._flag is 0 or self._flag is 16
 
 
 #   A class definition for a lookup sequence in Illumina format
@@ -197,9 +212,13 @@ class Lookup(object):
         self._code = None
         self._iupac = None
         self._length = None
+        self._rc = False
         #   Get the rest of the information we need for our lookup
         self._capture_snp()
         self._find_iupac()
+
+    def __repr__(self):
+        return self._snpid + ':' + self._code
 
     def _capture_snp(self):
         """Capture the SNP and it's position from the start and end of the sequence"""
@@ -221,6 +240,10 @@ class Lookup(object):
         #   Calculate the length of the sequence
         self._length = len(self._iupac)
 
+    def set_rc(self):
+        """Set the lookup sequence to reverse complement"""
+        self._rc = True
+
     def get_snpid(self):
         """Get the SNP ID"""
         return self._snpid
@@ -236,6 +259,10 @@ class Lookup(object):
     def get_length(self):
         """Get the length of the IUPAC sequence"""
         return self._length
+
+    def get_rc(self):
+        """See if the lookup is reverse complement"""
+        return self._rc
 
     #   Search the IUPAC codes for an alternate allele of a SNP
     def get_alternate(self, reference):
@@ -336,7 +363,8 @@ def main():
                     continue # Skip it
                 else: # Otherwise
                     a = Alignment(line) # Create an alignment from the line
-                    alignment_dict[a.get_name()] = a # Add the alignment to our alignment dictionary
+                    if a.check_flag():
+                        alignment_dict[a.get_name()] = a # Add the alignment to our alignment dictionary
     except FileNotFoundError as error: # If any files were not found
         sys.exit("Failed to find " + error.filename) # Exit with error
     for l in lookup_dict: # For every lookup we have
@@ -346,9 +374,14 @@ def main():
             except AssertionError:
                 sys.exit("Something happened with creating a SNP object...")
             if s.check_masked(): # Check to see if the alternate allele was masked
-                masked.append(s) # If so, add SNP to list of masked SNPs
-            else: # Otherwise
-                SNPs.append(s) # Append the SNP to our list of SNPs
+                lookup_dict[l].set_rc()
+                new_s = SNP(lookup_dict[l], alignment_dict[l], reference)
+                if new_s.check_masked():
+                    masked.append(s) # If so, add SNP to list of masked SNPs
+                    continue # Don't do anything else
+                else:
+                    s = new_s
+            SNPs.append(s) # Append the SNP to our list of SNPs
         else: # Otherwise
             unmapped.append(l) # Append lookup SNP ID to our list of unmapped
     if len(SNPs) < 1:
