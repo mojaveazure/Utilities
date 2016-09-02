@@ -54,7 +54,7 @@ makeAruments <- function(){
 
 #   Write our output file
 writeOutput <- function(data, outfile){
-    write.table(x = data, file = outfile, row.names = FALSE, col.names = FALSE, quote = FALSE)
+    write.table(x = data, file = outfile, row.names = FALSE, col.names = FALSE, quote = FALSE, sep = '\t')
     print(paste("FOF file can be found at", outfile))
 }
 
@@ -74,7 +74,7 @@ main <- function(){
     #   Read in data
     regions <- read.table(file = args$regions, header = FALSE, as.is = TRUE)
     regions$fasta <- replicate(n = nrow(regions), expr = args$reference)
-    writeOutput(data = data.frame(regions[[1]], regions$fasta))
+    writeOutput(data = data.frame(regions[[1]], regions$fasta), outfile = args$output)
 }
 
 main()
