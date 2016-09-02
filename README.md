@@ -7,3 +7,5 @@ A repository full of bioinformatics-related utilities
 - `getCoverage.sh`: A BASH shell script to calculate the coverage from a BEDTools coverage histogram
 - `idxSummarize.sh`: A BASH shell script that creates a single file summarizing the results from SAMTools idxstats
 - `subsample.sh`: A BASH shell script that randomly subsamples a FastQ file
+- `makeFOF.R`: an R script to make a FOF for Consed from a list of regions and reference fasta
+
