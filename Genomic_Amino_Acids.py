@@ -47,6 +47,7 @@ class AminoAcidMutant(object):
         Reference amino acid
         Mutant amino acid
     """
+
     def __init__(self, protein_name, aa_position, reference, mutant):
         try:
             assert isinstance(protein_name, str)
@@ -61,6 +62,9 @@ class AminoAcidMutant(object):
         self._aa_position = aa_position
         self._reference_aa = reference
         self._mutant_aa = mutant
+
+    def __repr__(self):
+        return self._protein_name + ' (' + self._reference_aa + '/' + self._mutant_aa + ')'
 
     def get_protein(self):
         """Return the name of the protein"""
@@ -98,6 +102,7 @@ class Annotation(object):
         End position
         Gene ID
     """
+
     def __init__(self, start, end, geneid):
         try:
             assert isinstance(start, int)
@@ -108,6 +113,9 @@ class Annotation(object):
         self._start = start
         self._end = end
         self._geneid = geneid
+
+    def __repr__(self):
+        return self._geneid + ':' + str(self._start) + '-' + str(self._end)
 
     def get_start(self):
         """Return the start of the region"""
@@ -132,6 +140,7 @@ class Gene(object):
         Start position of contig
         End position of contig
         Sequence"""
+
     def __init__(self, geneid, contig, start, end, sequence):
         try:
             assert isinstance(geneid, str)
@@ -146,6 +155,9 @@ class Gene(object):
         self._start = start
         self._end = end
         self._sequence = sequence
+
+    def __repr__(self):
+        return self._contig + ':' + self._geneid
 
     def get_geneid(self):
         """Get the gene name"""
@@ -170,7 +182,9 @@ class SNP(object):
         Reference Base
         Alternate Base
     """
+
     _REVERSE_COMPLEMENT = str.maketrans('ACGT', 'TGCA') # Translation table for reverse complentary sequences
+
     def __init__(self, snpid, contig, position, reference, alternate):
         try:
             assert isinstance(snpid, str)
@@ -187,6 +201,9 @@ class SNP(object):
         self._position = position
         self._reference = reference
         self._alternate = alternate
+
+    def __repr__(self):
+        return self._snpid
 
     def check_masked(self):
         """Check to see if our alternate allele is masked"""
@@ -276,13 +293,29 @@ def get_snps(mutant, model, annotation_list):
     snp_pos = [find_snp_position(codon, alt) for alt in PROTEIN_DICTIONARY[mutant.get_mutant()]]
     #   Calculate the genomic position of the mutation
     dna_pos = model_pos + annotation_list[0].get_start() # Start out with our first CDS
-    for cds in annotation_list: # For every CDS defined
-        region = cds.get_end() - cds.get_start() # Define a region for the current CDS
-        if (dna_pos - region) > 0: # If our SNP lies outside of the region defined
-            dna_pos -= region # Remove the region from our calculate
-        else: # Otherwise, our SNP is still in this region
-            dna_pos += cds.get_start() # Calculate the genomic position
-            break # Break our loop
+    try:
+        for index, cds in enumerate(annotation_list): # For every CDS defined
+            if dna_pos > cds.get_end(): # If our DNA position is outside of this CDS
+                dna_pos -= cds.get_end() # Subtract the CDS from it
+                dna_pos += annotation_list[index + 1].get_start() # Add the remainder to the next CDS
+            else: # If not
+                break # We have a position! Exit out of the loop
+    except IndexError:
+        print(mutant, "is beyond the CDS for", model, file=sys.stderr)
+        valid = False
+    # for cds in annotation_list: # For every CDS defined
+    #     dna_pos += cds.get_start()
+    #     region = cds.get_end() - cds.get_start()
+    #     if dna_pos > cds.get_end():
+    #         dna_pos -= region
+    #     else:
+    #         break
+    #     region = cds.get_end() - cds.get_start() # Define a region for the current CDS
+    #     if (dna_pos - region) > 0: # If our SNP lies outside of the region defined
+    #         dna_pos -= region # Remove the region from our calculate
+    #     else: # Otherwise, our SNP is still in this region
+    #         dna_pos += cds.get_start() # Calculate the genomic position
+    #         break # Break our loop
     #   Create our SNPs
     snp_list = []
     for index in range(len(snp_pos)):
@@ -363,7 +396,7 @@ def main():
         print("Reading " + args['model'], file=sys.stderr)
         gene_model = open(args['model']).read() # Read in the entire file as a string
         model_list = gene_model.split('>') # Split by the FASTA header
-        model_dict = dict(map(parse_gene, model_list[1:]))# Parse the gene model, ignoring the first entry which is ''
+        model_dict = dict(map(parse_gene, model_list[1:])) # Parse the gene model, ignoring the first entry which is ''
         #   Read in the GFF file as a dictionary
         ann_dict = {}
         with open(args['gff'], 'r') as g:
@@ -438,4 +471,5 @@ def main():
                 f.write('\n')
 
 
-main()
+if __name__ == '__main__':
+    main()
