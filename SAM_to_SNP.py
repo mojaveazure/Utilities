@@ -280,6 +280,13 @@ class Lookup(object):
         else: # Otherwise, give an 'N'
             return 'N', False
 
+    def format_fasta(self):
+        fasta = [
+            '>' + self._snpid,
+            self._iupac
+        ]
+        return '\n'.join(fasta)
+
 
 #   Make an argument parser
 def make_argument_parser():
