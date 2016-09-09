@@ -166,7 +166,7 @@ def parse_snps(geno_list, pos_dict):
     try:
         assert isinstance(geno_list, list)
         for g in geno_list:
-            assert g == '0' or g == '1' or g == '2'
+            assert g == '0' or g == '1' or g == '2' or g == '-1'
         assert isinstance(pos_dict, dict)
     except AssertionError:
         raise
