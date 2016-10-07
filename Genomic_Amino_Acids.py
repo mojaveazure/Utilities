@@ -13,6 +13,7 @@ try:
 except ImportError as error:
     sys.exit("Failed to load " + error.name)
 
+
 PROTEIN_DICTIONARY = {
     'F': ['TTT', 'TTC'],
     'L': ['TTA', 'TTG', 'CTT', 'CTC', 'CTA', 'CTG'],
