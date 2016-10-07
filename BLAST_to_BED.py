@@ -234,8 +234,8 @@ def run_blastn(query, database, evalue, max_seqs, max_hsps):
     #   Setup BLASTn
     blastn = NcbiblastnCommandline(
         query=query,
-        database=database,
-        # evalue=evalue,
+        db=database,
+        evalue=evalue,
         outfmt=5,
         max_target_seqs=max_seqs,
         max_hsps=max_hsps,
