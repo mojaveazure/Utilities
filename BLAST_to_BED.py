@@ -353,7 +353,7 @@ def main():
     args = vars(parser.parse_args())
     try:
         #   Are we running a BLAST search given a FASTA?
-        if args['fasta']:
+        if 'fasta' in args.keys():
             if not args['database']:
                 raise NoReferenceError
             print("BLASTing", args['fasta'], "against", args['database'], file=sys.stderr)
@@ -365,7 +365,7 @@ def main():
                 max_hsps=args['max_hsps']
             )
         #   Or are we given a BLAST XML file?
-        elif args['xml']:
+        elif 'xml' in args.keys():
             print("Using", args['xml'], "as input", file=sys.stderr)
             blast_xml = args['xml']
         else:
@@ -382,8 +382,6 @@ def main():
             print("Writing to", args['outfile'], file=sys.stderr)
             no_hit_name = os.path.basename(args['outfile']) + '_failed.log'
             outhandle = open(args['outfile'], 'w')
-    except KeyError:
-        pass
     except FeatureNotFound:
         sys.exit("Pleast install 'lxml' to properly parse the BLAST results")
     except NoReferenceError:
