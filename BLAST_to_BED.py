@@ -5,9 +5,10 @@ import sys
 if sys.version_info.major is not 3:
     sys.exit("Please use Python 3 for this script")
 
+
 import os
+import re
 import argparse
-from itertools import repeat
 
 try:
     from bs4 import BeautifulSoup
@@ -17,8 +18,8 @@ try:
 except ImportError as error:
     sys.exit("Please install " + error.name)
 
-DEFAULT_OUTPUT = os.getcwd() + '/output.bed'
 
+DEFAULT_OUTPUT = os.getcwd() + '/output.bed'
 
 #   An error for no reference provided
 class NoReferenceError(Exception):
@@ -57,9 +58,12 @@ class Hit(object):
             assert isinstance(hstart, int)
             assert isinstance(hend, int)
             assert isinstance(hstrand, int)
+        except AssertionError:
+            raise TypeError
+        try:
             assert hstrand == 1 or hstrand == -1
         except AssertionError:
-            raise
+            raise ValueError
         self._chrom = chrom
         self._name = name
         self._evalue = evalue
@@ -104,7 +108,7 @@ class SNPIteration(object):
         try:
             assert isinstance(tag, element.Tag)
         except AssertionError:
-            raise
+            raise TypeError
         return tag.findChild(value).text
 
     _VALS = ['Hsp_evalue', 'Hsp_hit-from', 'Hsp_hit-to', 'Hsp_hit-frame']
@@ -112,7 +116,7 @@ class SNPIteration(object):
         try:
             assert isinstance(iteration, element.Tag)
         except AssertionError:
-            raise
+            raise TypeError
         self._snpid = SNPIteration.GET_VALUE(iteration, 'Iteration_query-def')
         self._hits = []
         self._fail = False
@@ -131,7 +135,7 @@ class SNPIteration(object):
         try:
             assert isinstance(hsp, element.Tag)
         except AssertionError:
-            raise
+            raise TypeError
         #   Collect all values
         hsp_vals = []
         for val in self._VALS:
@@ -145,7 +149,7 @@ class SNPIteration(object):
         try:
             assert isinstance(hit, element.Tag)
         except AssertionError:
-            raise
+            raise TypeError
         chrom = SNPIteration.GET_VALUE(hit, 'Hit_def') # Get the chromosome information
         hsps = [] # A list to hold hsps
         for hsp in hit.findAll('Hsp'):
@@ -190,25 +194,47 @@ class SNPIteration(object):
         return bed_lines
 
 
+#   Ensure we have our BLAST database
+def validate_db(db_path):
+    """Find a BLAST nucleotide database"""
+    try:
+        assert isinstance(db_path, str)
+    except AssertionError:
+        raise TypeError
+    db_name = os.path.basename(db_path)
+    nhr = re.compile(r'(%s\.[0-9\.]*nhr)' % db_name).search
+    nin = re.compile(r'(%s\.[0-9\.]*nin)' % db_name).search
+    nsq = re.compile(r'(%s\.[0-9\.]*nsq)' % db_name).search
+    nal = re.compile(r'(%s\.*nal)' % db_name).search
+    db_directory = os.path.abspath(os.path.realpath(os.path.dirname(db_path)))
+    if not db_directory:
+        db_directory = os.getcwd()
+    print('Searching for proper database files for', db_name, 'in', db_directory, file=sys.stderr)
+    db_contents = '\n'.join(os.listdir(db_directory))
+    if not nhr(db_contents) and not nin(db_contents) and not nsq(db_contents) and not nal(db_contents):
+        raise FileNotFoundError("Failed to find the BLAST nucleotide database")
+
+
 #   A function to run BLASTn
-def run_blastn(query, subject, evalue, max_seqs, max_hsps):
+def run_blastn(query, database, evalue, max_seqs, max_hsps):
     """Run BLASTn"""
     try:
         assert isinstance(query, str)
-        assert isinstance(subject, str)
+        assert isinstance(database, str)
         assert isinstance(evalue, float)
         assert isinstance(max_seqs, int)
         assert isinstance(max_hsps, int)
     except AssertionError:
-        raise
+        raise TypeError
     #   Create an output name
     query_base = os.path.basename(os.path.splitext(query)[0])
-    subject_base = os.path.basename(os.path.splitext(subject)[0])
-    blast_out = os.getcwd() + '/' + query_base + '_' + subject_base + '_BLAST.xml'
+    database_base = os.path.basename(os.path.splitext(database)[0])
+    blast_out = os.getcwd() + '/' + query_base + '_' + database_base + '_BLAST.xml'
+    validate_db(database)
     #   Setup BLASTn
     blastn = NcbiblastnCommandline(
         query=query,
-        subject=subject,
+        database=database,
         # evalue=evalue,
         outfmt=5,
         max_target_seqs=max_seqs,
@@ -265,14 +291,14 @@ def make_argument_parser():
         help="Name of output file to write to, defaults to '" + DEFAULT_OUTPUT + "', incompatible with '-b | --bed'"
     )
     parser.add_argument(
-        '-r',
-        '--reference',
-        dest='reference',
+        '-d',
+        '--database',
+        dest='database',
         type=str,
         required=False,
         default=None,
-        metavar='REFERENCE FASTA FILE',
-        help="Reference FASTA file for BLAST"
+        metavar='REFERENCE BLAST DATABASE',
+        help="Reference BLAST database in nucleotide format"
     )
     parser.add_argument(
         '-e',
@@ -330,10 +356,10 @@ def main():
         if args['fasta']:
             if not args['reference']:
                 raise NoReferenceError
-            print("BLASTing", args['fasta'], "against", args['reference'], file=sys.stderr)
+            print("BLASTing", args['fasta'], "against", args['database'], file=sys.stderr)
             blast_xml = run_blastn(
                 query=args['fasta'],
-                subject=args['reference'],
+                database=args['database'],
                 evalue=args['evalue'],
                 max_seqs=args['max_hits'],
                 max_hsps=args['max_hsps']
