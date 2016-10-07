@@ -354,7 +354,7 @@ def main():
     try:
         #   Are we running a BLAST search given a FASTA?
         if args['fasta']:
-            if not args['reference']:
+            if not args['database']:
                 raise NoReferenceError
             print("BLASTing", args['fasta'], "against", args['database'], file=sys.stderr)
             blast_xml = run_blastn(
