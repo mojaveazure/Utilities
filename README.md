@@ -1,6 +1,12 @@
 # Utilities
 A repository full of bioinformatics-related utilities
 
+To download, install Git on your computer and run the following command:
+
+```bash
+git clone --recursive https://github.com/mojaveazure/Utilities.git
+```
+
 
 - `SAM_to_SNP.py`: A Python 3 script that calculates exact SNP position using an Illumina lookup table, SAM file for contextual sequences, and reference genome
 - `fakeHeader.sh`: A BASH shell script to add the '@HD' header to a SAM or BAM file
