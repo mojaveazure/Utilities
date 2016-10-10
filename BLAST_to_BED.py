@@ -9,6 +9,8 @@ if sys.version_info.major is not 3:
 import os
 import re
 import argparse
+from itertools import repeat
+from copy import deepcopy
 
 try:
     from bs4 import BeautifulSoup
@@ -20,6 +22,17 @@ except ImportError as error:
 
 
 DEFAULT_OUTPUT = os.getcwd() + '/output.bed'
+
+VALS = [
+    'Hsp_evalue',
+    'Hsp_hit-from',
+    'Hsp_hit-to',
+    'Hsp_hit-frame'
+    ]
+
+NO_HIT_MESSAGE = 'No hits found'
+
+HSP_SORT = lambda hsp: (hsp.get_chrom(), hsp.get_start(), hsp.get_end())
 
 #   An error for no reference provided
 class NoReferenceError(Exception):
@@ -36,19 +49,16 @@ class BLASTFailedError(Exception):
     """BLAST seems to have failed..."""
 
 
-#   A class definition for a BLAST hit
-class Hit(object):
-    """This is a class for a BLAST hit
+#   A class definition for a BLAST Hsp
+class Hsp(object):
+    """This is a class for a BLAST Hsp
     It continas the following information:
         Chromosome name
         Query name
-        Hit e-value
-        Query sequence
-        Subject sequence
-        Hit start relative to subject
-        Hit end relative to subject
+        Hsp e-value
+        Hsp start relative to subject
+        Hsp end relative to subject
         Subject strand (forward or reverse)
-        SNP Position relative to subject (once calcualted with Hit.get_snp_position())
         """
     def __init__(self, chrom, name, evalue, hstart, hend, hstrand):
         try:
@@ -74,17 +84,60 @@ class Hit(object):
     def __repr__(self):
         return self._name + ":" + str(self._evalue)
 
-    def get_chrom(self):
-        """Get the chromosome that the hit matched to"""
-        return self._chrom
+    def __eq__(self, other):
+        if isinstance(other, Hsp):
+            return self._name == other._name and self._evalue == other._evalue
+        elif isinstance(other, str):
+            return self._name == other
+        elif isinstance(other, float):
+            return self._evalue == other
+        else:
+            return NotImplemented
 
-    def get_name(self):
-        """Get the query name of the hit"""
-        return self._name
+    def __lt__(self, other):
+        if isinstance(other, Hsp):
+            return self._evalue < other._evalue
+        elif isinstance(other, float):
+            return self._evalue < other
+        else:
+            return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, Hsp):
+            return self._evalue <= other._evalue
+        elif isinstance(other, float):
+            return self._evalue <= other
+        else:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash(self._name)
+
+    def get_chrom(self):
+        """Get the chromosome of our hsp"""
+        return self._chrom
 
     def get_rc(self):
         """Did the query align to the forward (False) or reverse (True) strand"""
         return self._hstrand == -1
+
+    def get_start(self):
+        """Get the start of our hsp relative to forward"""
+        if self.get_rc():
+            return self._end
+        else:
+            return self._start
+
+    def get_end(self):
+        """Get the end of our hsp relative to forward"""
+        if self.get_rc():
+            return self._start
+        else:
+            return self._end
+
+    def get_name(self):
+        """Get the query name of our hsp"""
+        return self._name
 
     def format_bed(self):
         """Format a BED file"""
@@ -97,101 +150,6 @@ class Hit(object):
             bed += [str(self._start - 1), str(self._end)]
         bed.append(self._name)
         return '\t'.join(bed)
-
-
-#   A class definition for holding Iterations
-class SNPIteration(object):
-    """This is a class for holding BLAST iterations
-    It holds the SNP name and a list of hits"""
-    @staticmethod
-    def GET_VALUE(tag, value):
-        try:
-            assert isinstance(tag, element.Tag)
-        except AssertionError:
-            raise TypeError
-        return tag.findChild(value).text
-
-    _VALS = ['Hsp_evalue', 'Hsp_hit-from', 'Hsp_hit-to', 'Hsp_hit-frame']
-    def __init__(self, iteration):
-        try:
-            assert isinstance(iteration, element.Tag)
-        except AssertionError:
-            raise TypeError
-        self._snpid = SNPIteration.GET_VALUE(iteration, 'Iteration_query-def')
-        self._hits = []
-        self._fail = False
-        #   Start parsing hits
-        for hit in iteration.findAll('Hit'):
-            self._parse_hit(hit)
-        # If we don't have any hits, set 'self._fail' to True
-        if len(self._hits) < 1:
-            self._fail = True
-
-    def __repr__(self):
-        return self._snpid + '(' + str(len(self._hits)) + ' hit(s))'
-
-    def _parse_hsp(self, hsp):
-        """Parse the hsp section of a BLAST XML"""
-        try:
-            assert isinstance(hsp, element.Tag)
-        except AssertionError:
-            raise TypeError
-        #   Collect all values
-        hsp_vals = []
-        for val in self._VALS:
-            hsp_vals.append(SNPIteration.GET_VALUE(hsp, val))
-        # hsp_vals = map(SNPIteration.GET_VALUE, repeat(hsp, len(self._VALS)), self._VALS)
-        #   Return as a tuple
-        return tuple(hsp_vals)
-
-    def _parse_hit(self, hit):
-        """Parse the hit section of a BLAST XML"""
-        try:
-            assert isinstance(hit, element.Tag)
-        except AssertionError:
-            raise TypeError
-        chrom = SNPIteration.GET_VALUE(hit, 'Hit_def') # Get the chromosome information
-        hsps = [] # A list to hold hsps
-        for hsp in hit.findAll('Hsp'):
-            try:
-                #   Try to parse the hsp
-                hsp_vals = self._parse_hsp(hsp)
-                hsps.append(hsp_vals)
-            except NoHitError: # If there's no gap, skip
-                continue
-        for hsp in hsps:
-            #   Unpack our tuple
-            (evalue, hit_start, hit_end, strand) = hsp
-            #   Make a Hit
-            hit = Hit(
-                chrom=chrom,
-                name=self._snpid,
-                evalue=float(evalue),
-                hstart=int(hit_start),
-                hend=int(hit_end),
-                hstrand=int(strand)
-            )
-            #   Add our Hit to the list of Hits
-            self._hits.append(hit)
-
-    def get_snpid(self):
-        """Get the SNP ID for this iteration"""
-        return self._snpid
-
-    def check_fail(self):
-        """See if we are lacking any hits"""
-        if self._fail:
-            raise NoHitError
-
-    def format_bed(self):
-        try:
-            self.check_fail()
-        except NoHitError:
-            raise
-        bed_lines = []
-        for hit in self._hits:
-            bed_lines.append(hit.format_bed())
-        return bed_lines
 
 
 #   Ensure we have our BLAST database
@@ -213,6 +171,61 @@ def validate_db(db_path):
     db_contents = '\n'.join(os.listdir(db_directory))
     if not nhr(db_contents) and not nin(db_contents) and not nsq(db_contents) and not nal(db_contents):
         raise FileNotFoundError("Failed to find the BLAST nucleotide database")
+
+
+#   A funtion to get the value from a tag
+def get_value(tag, value):
+    """Get the text from a specific tag from a element.Tag object"""
+    try:
+        assert isinstance(tag, element.Tag)
+        return tag.findChild(value).text
+    except AssertionError:
+        raise TypeError
+    except:
+        raise
+
+
+#   A function to parse the HSP section of a BLAST XML file
+def parse_hsp(hsp):
+    """Parse the HSP section of a BLAST XML file"""
+    try:
+        assert isinstance(hsp, element.Tag)
+    except AssertionError:
+        raise TypeError
+    hsp_vals = map(get_value, repeat(hsp, len(VALS)), VALS)
+    return tuple(hsp_vals)
+
+
+#   A function to parse the Hit section of a BLAST XML file
+def parse_hit(snpid, hit):
+    """Parse the Hit section of a BLAST XML file"""
+    try:
+        assert isinstance(snpid, str)
+        assert isinstance(hit, element.Tag)
+    except AssertionError:
+        raise TypeError
+    chrom = get_value(tag=hit, value='Hit_def')
+    #   Holding lists
+    vals = list()
+    hsps = list()
+    for hsp in hit.findAll('Hsp'):
+        hsp_vals = parse_hsp(hsp=hsp)
+        vals.append(hsp_vals)
+    for val in vals:
+        (evalue, hsp_start, hsp_end, strand) = val
+        hsp = Hsp(
+            chrom=chrom,
+            name=snpid,
+            evalue=float(evalue),
+            hstart=int(hsp_start),
+            hend=int(hsp_end),
+            hstrand=int(strand),
+        )
+        hsps.append(hsp)
+    if hsps:
+        return hsps
+    else:
+        return None
 
 
 #   A function to run BLASTn
@@ -251,9 +264,17 @@ def run_blastn(query, database, evalue, max_seqs, max_hsps):
 
 #   Make an argument parser
 def make_argument_parser():
-    parser = argparse.ArgumentParser(add_help=True)
-    inputs = parser.add_mutually_exclusive_group(required=True)
-    inputs.add_argument( # Take FASTA as input
+    """Make an argument parser"""
+    parser = argparse.ArgumentParser(
+        add_help=False,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    inputs = parser.add_argument_group(
+        title='Input options',
+        description="Specify the type of input we're working with, '-f | --fasta' requires BLASTn from NCBI to be installed"
+    )
+    in_mut = inputs.add_mutually_exclusive_group(required=True)
+    in_mut.add_argument( # Take FASTA as input
         '-f',
         '--fasta',
         dest='fasta',
@@ -262,7 +283,7 @@ def make_argument_parser():
         metavar='FASTA FILE',
         help="Input FASTA file to run BLAST on, incompatible with '-x | --xml'"
     )
-    inputs.add_argument( # Take XML as input
+    in_mut.add_argument( # Take XML as input
         '-x',
         '--xml',
         dest='xml',
@@ -271,8 +292,12 @@ def make_argument_parser():
         metavar='XML FILE',
         help="Input BLAST XML file to turn into BED file, incompatible with '-f | --fasta'"
     )
-    outputs = parser.add_mutually_exclusive_group(required=False)
-    outputs.add_argument( # Append to preexisting BED file
+    outputs = parser.add_argument_group(
+        title='Output options',
+        description="Specify how we're writing our output files, create new file or append to preexisting BED file"
+    )
+    out_mut = outputs.add_mutually_exclusive_group(required=False)
+    out_mut.add_argument( # Append to preexisting BED file
         '-b',
         '--bed',
         dest='bed',
@@ -281,7 +306,7 @@ def make_argument_parser():
         metavar='BED FILE',
         help="BED file to append results to, incompatible with '-o | --outfile'"
     )
-    outputs.add_argument( # Write to new BED file
+    out_mut.add_argument( # Write to new BED file
         '-o',
         '--outfile',
         dest='outfile',
@@ -290,7 +315,11 @@ def make_argument_parser():
         metavar='OUTPUT FILE',
         help="Name of output file to write to, defaults to '" + DEFAULT_OUTPUT + "', incompatible with '-b | --bed'"
     )
-    parser.add_argument( # BLAST database to BLAST against
+    blast_opts = parser.add_argument_group(
+        title='BLAST options',
+        description="Options only used when BLASTING, no not need to provide with '-x | --xml'"
+    )
+    blast_opts.add_argument( # BLAST database to BLAST against
         '-d',
         '--database',
         dest='database',
@@ -300,7 +329,7 @@ def make_argument_parser():
         metavar='REFERENCE BLAST DATABASE',
         help="Reference BLAST database in nucleotide format, used only when running BLAST"
     )
-    parser.add_argument( # E-value threshold
+    blast_opts.add_argument( # E-value threshold
         '-e',
         '--evalue',
         dest='evalue',
@@ -310,7 +339,7 @@ def make_argument_parser():
         metavar='E-VALUE THRESHOLD',
         help="Evalue threshold for BLAST, defaults to '1e-1', used only when running BLAST"
     )
-    parser.add_argument( # Maximum number of hits
+    blast_opts.add_argument( # Maximum number of hits
         '-s',
         '--max-hits',
         dest='max_hits',
@@ -320,7 +349,7 @@ def make_argument_parser():
         metavar='MAX HITS',
         help="Maximum hits per query, defaults to '1', used only when running BLAST"
     )
-    parser.add_argument( # Maximum number of HSPs
+    blast_opts.add_argument( # Maximum number of HSPs
         '-m',
         '--max-hsps',
         dest='max_hsps',
@@ -330,7 +359,7 @@ def make_argument_parser():
         metavar='MAX HSPS',
         help="Maximum HSPs per hit, defaults to '1', used only when running BLAST"
     )
-    parser.add_argument( # Do we keep the XML file from BLAST?
+    blast_opts.add_argument( # Do we keep the XML file from BLAST?
         '-k',
         '--keep-xml',
         dest='keep_xml',
@@ -340,6 +369,33 @@ def make_argument_parser():
         default=False,
         metavar='KEEP XML',
         help="Do we keep the XML results? pas '-k | --keep-xml' to say 'yes', used only when running BLAST"
+    )
+    filters = parser.add_argument_group(
+        title='Filtering options',
+        description="Options to filter the resulting BED file, can specify as many or as few chromosome/contig names as you want. You may choose to either exclude or keep, not both. Note: this only affects the immediate output of this script, we will not filter a preexisting BED file"
+    )
+    filt_opts = filters.add_mutually_exclusive_group(required=False)
+    filt_opts.add_argument(
+        '-X',
+        '--exclude-chrom',
+        dest='exclude',
+        required=False,
+        type=str,
+        default=None,
+        nargs='*',
+        metavar='EXCLUDE CHROMOSOMES',
+        help="Chromosomes/Contigs to exclude from BED file, everything else is kept, incompatible with '-K | --keep-chrom'"
+    )
+    filt_opts.add_argument(
+        '-K',
+        '--keep-chrom',
+        dest='keep',
+        required=False,
+        type=str,
+        default=None,
+        nargs='*',
+        metavar='KEEP ONLY CHROMOSOMES',
+        help="Chromosomes/Contigs to keep from BED file, everything else is excluded, incompatible with '-X | --exclude-chrom'"
     )
     return parser
 
@@ -373,48 +429,90 @@ def main():
             raise NotImplementedError("Whatever you're trying to do, we don't do yet...")
         #   Read in the XML as soup
         blast_soup = BeautifulSoup(open(blast_xml, 'r'), 'xml')
-        #   Make a dictionary to hold iterations and find all iterations
-        # iterations = []
-        if args['bed']:
-            print("Appending to", args['bed'], file=sys.stderr)
-            no_hit_name = os.path.basename(args['bed']) + '_failed.log'
+    except FeatureNotFound: # No lxml for XML parsing
+        sys.exit("Pleast install 'lxml' to properly parse the BLAST results")
+    except NoReferenceError: # No reference database passed
+        sys.exit(NoReferenceError)
+    except FileNotFoundError as error: # Can't open a file
+        sys.exit("Cannot find " + error.filename)
+    #   Collections for results
+    no_hit = set()
+    raw_hsps = list()
+    #   Parse the XML file
+    for query in blast_soup.findAll('Iteration'):
+        snpid = get_value(tag=query, value='Iteration_query-def')
+        try: # Ask to see if there were no hits
+            if get_value(tag=query, value='Iteration_message'):
+                print("No hit for", snpid, file=sys.stderr)
+                no_hit.add(snpid)
+                continue
+        except AttributeError: # No message
+            pass
+        #   For every hit in the iteration
+        for hit in query.findAll('Hit'):
+            hit_num = get_value(tag=hit, value='Hit_num')
+            this_hsps = parse_hit(snpid=snpid, hit=hit)
+            try:
+                raw_hsps += this_hsps
+            except TypeError:
+                print('No HSPs for', snpid, 'hit number:', hit_num, file=sys.stderr)
+                no_hit.add(snpid)
+                continue
+    #   Filter our Hsps
+    if 'exclude' in args.keys():
+        print("Removing SNPs that BLASTed to one of:", args['exclude'], file=sys.stderr)
+        hsps = list(filter(lambda hsp: hsp.get_chrom() not in args['exclude'], raw_hsps))
+    elif 'keep' in args.keys():
+        print("Removing SNPs that did not BLAST to one of:", args['keep'], file=sys.stderr)
+        hsps = list(filter(lambda hsp: hsp.get_chrom() in args['keep'], raw_hsps))
+    else:
+        hsps = deepcopy(raw_hsps)
+    filtered = [hsp for hsp in raw_hsps if hsp not in hsps]
+    #   Sort our Hsps
+    print("Sorting BLAST results by chromosome/contig, start position, and end position")
+    hsps.sort(key=HSP_SORT)
+    filtered.sort(key=HSP_SORT)
+    #   Set our output options
+    try:
+        if 'bed' in args.keys():
+            print("Appending", len(hsps), "searches to", args['bed'], file=sys.stderr)
+            # no_hit_name = os.path.basename(args['bed']) + '_failed.log'
+            out_base = os.path.splitext(args['bed'])[0]
             outhandle = open(args['bed'], 'a')
         else:
-            print("Writing to", args['outfile'], file=sys.stderr)
-            no_hit_name = os.path.basename(args['outfile']) + '_failed.log'
+            print("Writing", len(hsps), "searches to", args['outfile'], file=sys.stderr)
+            # no_hit_name = os.path.basename(args['outfile']) + '_failed.log'
+            out_base = os.path.splitext(args['outfile'])[0]
             outhandle = open(args['outfile'], 'w')
-    except FeatureNotFound:
-        sys.exit("Pleast install 'lxml' to properly parse the BLAST results")
-    except NoReferenceError:
-        sys.exit(NoReferenceError)
     except FileNotFoundError as error:
         sys.exit("Cannot find " + error.filename)
-    no_hit = []
-    for query in blast_soup.findAll('Iteration'):
-        try:
-            iteration = SNPIteration(query)
-            # iterations.append(iteration)
-            bed_lines = iteration.format_bed()
-            outhandle.write('\n'.join(bed_lines))
-            outhandle.write('\n')
-        except NoHitError:
-            print("No hit found for", iteration.get_snpid(), file=sys.stderr)
-            no_hit.append(iteration.get_snpid())
-            continue
-    #   If we make our own BLAST XML and we aren't told to keep it
+    no_hit_name = out_base + '_failed.log'
+    filtered_name = out_base + '_filtered.bed'
+    #   Write the outputs
+    for hsp in hsps:
+        outhandle.write(hsp.format_bed())
+        outhandle.write('\n')
     outhandle.close()
+    #   Write any filtered BED lines
+    if filtered:
+        print("Writing", len(filtered), "filtered hits to", filtered_name, file=sys.stderr)
+        with open(filtered_name, 'w') as f:
+            for filt in filtered:
+                f.write(filt.format_bed())
+                f.write('\n')
+    #   Write the failed log
+    no_hit -= {hsp.get_name() for hsp in hsps}
     if len(no_hit) > 0:
         print("Writing", len(no_hit), "failed searches to", no_hit_name, file=sys.stderr)
         with open(no_hit_name, 'w') as n:
-            for fail in no_hit:
+            for fail in sorted(list(no_hit)):
                 n.write(fail)
                 n.write('\n')
-    if args['fasta'] and not args['keep_xml']:
+    if 'fasta' in args.keys() and not args['keep_xml']:
         print("Removing intermediate files", file=sys.stderr)
         os.remove(blast_xml) # Remove
 
 
 if __name__ == '__main__':
     main()
-
 
