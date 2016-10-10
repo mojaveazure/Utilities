@@ -253,7 +253,7 @@ def run_blastn(query, database, evalue, max_seqs, max_hsps):
 def make_argument_parser():
     parser = argparse.ArgumentParser(add_help=True)
     inputs = parser.add_mutually_exclusive_group(required=True)
-    inputs.add_argument(
+    inputs.add_argument( # Take FASTA as input
         '-f',
         '--fasta',
         dest='fasta',
@@ -262,7 +262,7 @@ def make_argument_parser():
         metavar='FASTA FILE',
         help="Input FASTA file to run BLAST on, incompatible with '-x | --xml'"
     )
-    inputs.add_argument(
+    inputs.add_argument( # Take XML as input
         '-x',
         '--xml',
         dest='xml',
@@ -272,7 +272,7 @@ def make_argument_parser():
         help="Input BLAST XML file to turn into BED file, incompatible with '-f | --fasta'"
     )
     outputs = parser.add_mutually_exclusive_group(required=False)
-    outputs.add_argument(
+    outputs.add_argument( # Append to preexisting BED file
         '-b',
         '--bed',
         dest='bed',
@@ -281,7 +281,7 @@ def make_argument_parser():
         metavar='BED FILE',
         help="BED file to append results to, incompatible with '-o | --outfile'"
     )
-    outputs.add_argument(
+    outputs.add_argument( # Write to new BED file
         '-o',
         '--outfile',
         dest='outfile',
@@ -290,7 +290,7 @@ def make_argument_parser():
         metavar='OUTPUT FILE',
         help="Name of output file to write to, defaults to '" + DEFAULT_OUTPUT + "', incompatible with '-b | --bed'"
     )
-    parser.add_argument(
+    parser.add_argument( # BLAST database to BLAST against
         '-d',
         '--database',
         dest='database',
@@ -298,9 +298,9 @@ def make_argument_parser():
         required=False,
         default=None,
         metavar='REFERENCE BLAST DATABASE',
-        help="Reference BLAST database in nucleotide format"
+        help="Reference BLAST database in nucleotide format, used only when running BLAST"
     )
-    parser.add_argument(
+    parser.add_argument( # E-value threshold
         '-e',
         '--evalue',
         dest='evalue',
@@ -308,9 +308,9 @@ def make_argument_parser():
         required=False,
         default=1e-1,
         metavar='E-VALUE THRESHOLD',
-        help="Evalue threshold for BLAST, defaults to '1e-1'"
+        help="Evalue threshold for BLAST, defaults to '1e-1', used only when running BLAST"
     )
-    parser.add_argument(
+    parser.add_argument( # Maximum number of hits
         '-s',
         '--max-hits',
         dest='max_hits',
@@ -318,9 +318,9 @@ def make_argument_parser():
         type=int,
         default=1,
         metavar='MAX HITS',
-        help="Maximum hits per query, defaults to '1'"
+        help="Maximum hits per query, defaults to '1', used only when running BLAST"
     )
-    parser.add_argument(
+    parser.add_argument( # Maximum number of HSPs
         '-m',
         '--max-hsps',
         dest='max_hsps',
@@ -328,9 +328,9 @@ def make_argument_parser():
         type=int,
         default=1,
         metavar='MAX HSPS',
-        help="Maximum HSPs per hit, defaults to '1'"
+        help="Maximum HSPs per hit, defaults to '1', used only when running BLAST"
     )
-    parser.add_argument(
+    parser.add_argument( # Do we keep the XML file from BLAST?
         '-k',
         '--keep-xml',
         dest='keep_xml',
@@ -339,7 +339,7 @@ def make_argument_parser():
         const=True,
         default=False,
         metavar='KEEP XML',
-        help="Do we keep the XML results? pas '-k | --keep-xml' to say 'yes'"
+        help="Do we keep the XML results? pas '-k | --keep-xml' to say 'yes', used only when running BLAST"
     )
     return parser
 
@@ -350,7 +350,8 @@ def main():
     parser = make_argument_parser()
     if not sys.argv[1:]:
         sys.exit(parser.print_help())
-    args = vars(parser.parse_args())
+    # args = vars(parser.parse_args())
+    args = {key : value for key, value in vars(parser.parse_args()).items() if value is not None}
     try:
         #   Are we running a BLAST search given a FASTA?
         if 'fasta' in args.keys():
@@ -411,7 +412,6 @@ def main():
     if args['fasta'] and not args['keep_xml']:
         print("Removing intermediate files", file=sys.stderr)
         os.remove(blast_xml) # Remove
-        
 
 
 if __name__ == '__main__':
