@@ -1,3 +1,6 @@
 [submodule "BLAST_to_BED"]
 	path = BLAST_to_BED
 	url = https://github.com/mojaveazure/BLAST_to_BED.git
+[submodule "SNP_Utils"]
+	path = SNP_Utils
+	url = https://github.com/mojaveazure/SNP_Utils.git
