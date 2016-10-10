@@ -1,0 +1,3 @@
+[submodule "BLAST_to_BED"]
+	path = BLAST_to_BED
+	url = https://github.com/mojaveazure/BLAST_to_BED.git
