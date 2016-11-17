@@ -70,7 +70,6 @@ class ZeroOneTwo(object):
     def __repr__(self):
         return self._name + ':' + str(len(self._snps))
 
-
     def __eq__(self, other):
         if isinstance(other, ZeroOneTwo):
             equal_snps = len(self._snps) == len(other._snps)
