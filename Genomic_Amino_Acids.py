@@ -14,6 +14,13 @@ except ImportError as error:
     sys.exit("Failed to load " + error.name)
 
 
+# def gettup(mystr):
+#     return tuple(mystr.split(maxsplit=1))
+
+# q = map(gettup, ['hello world', 'potato head'])
+# t = {x : y for x, y in q}
+
+
 PROTEIN_DICTIONARY = {
     'F': ['TTT', 'TTC'],
     'L': ['TTA', 'TTG', 'CTT', 'CTC', 'CTA', 'CTG'],
@@ -38,6 +45,30 @@ PROTEIN_DICTIONARY = {
     'STOP': ['TAA', 'TAG', 'TGA']
 }
 
+ALLOWABLE_SNPS = {
+    1 : (
+        {'F', 'L', 'I', 'M', 'V'},
+        {'S', 'O', 'T', 'A'},
+        {'Y', 'H', 'Q', 'N', 'K', 'D', 'E'},
+        {'C', 'W', 'R', 'S', 'G'}
+    ),
+    2 : (
+        {'F', 'L', 'S', 'Y', 'C', 'W'},
+        {'L', 'P', 'H', 'Q', 'R'},
+        {'I', 'M', 'T', 'N', 'K', 'S', 'R'},
+        {'V', 'A', 'D', 'E', 'G'}
+    ),
+    3 : (
+        {'F', 'L'},
+        {'I', 'M'},
+        {'H', 'Q'},
+        {'N', 'K'},
+        {'D', 'E'},
+        {'C', 'W'},
+        {'S', 'R'}
+    )
+}
+
 #   A class for mutants from an amino acid lookup table
 class AminoAcidMutant(object):
     """This is a class for mutant amino acids
@@ -55,10 +86,13 @@ class AminoAcidMutant(object):
             assert isinstance(aa_position, int)
             assert isinstance(reference, str)
             assert isinstance(mutant, str)
+        except AssertionError:
+            raise TypeError
+        try:
             assert len(reference) == 1
             assert len(mutant) == 1
         except AssertionError:
-            raise
+            raise ValueError
         self._protein_name = protein_name
         self._aa_position = aa_position
         self._reference_aa = reference
@@ -411,7 +445,7 @@ def main():
                 else: # Otherwise
                     ann_dict[a.get_geneid()] = [a] # Create an entry for it
         for geneid in ann_dict: # For every protein defined
-            ann_dict[geneid].sort(key = lambda ann : ann.get_start())  # Sort by start position
+            ann_dict[geneid].sort(key=lambda ann: ann.get_start())  # Sort by start position
         #   Read in the amino acid lookup table
         mut_list = []
         with open(args['lookup'], 'r') as l:
@@ -470,6 +504,19 @@ def main():
             for mutant in failed:
                 f.write(mutant.format_fail())
                 f.write('\n')
+
+# def main():
+#     parser = make_argument_parser()
+#     if not sys.argv[1:]:
+#         sys.exit(parser.print_help())
+#     args = vars(parser.parse_args())
+#     try:
+#         #   Parse the GFF file
+#         # gff = open(args['gff'], 'r').readlines()
+#         # anns = map(lambda line: parse_gff(line.strip()) if 'CDS' in line else None, open(args['gff'], 'r').readlines())
+#         # annotation_dictionary = {a.get_geneid(): a for a in anns}
+#     except FileNotFoundError as error:
+#         sys.exit("Failed to find " + error.filename)
 
 
 if __name__ == '__main__':
